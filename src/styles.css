@@ -1,0 +1,38 @@
+/* 图床插件右键菜单样式 */
+
+/* 上传图床图片菜单项 - 蓝色 */
+.menu-item[data-id="my-command-upload-image"] {
+    color: #2e86ff !important;
+}
+
+.menu-item[data-id="my-command-upload-image"]:hover {
+    background-color: rgba(46, 134, 255, 0.1) !important;
+    color: #1a5bb8 !important;
+}
+
+/* 删除图床图片菜单项 - 红色 */
+.menu-item[data-id="my-command-delete-image"] {
+    color: #ff4757 !important;
+}
+
+.menu-item[data-id="my-command-delete-image"]:hover {
+    background-color: rgba(255, 71, 87, 0.1) !important;
+    color: #d63031 !important;
+}
+
+/* 图标颜色 */
+.menu-item[data-id="my-command-upload-image"] .menu-item-icon svg {
+    color: #2e86ff !important;
+}
+
+.menu-item[data-id="my-command-upload-image"]:hover .menu-item-icon svg {
+    color: #1a5bb8 !important;
+}
+
+.menu-item[data-id="my-command-delete-image"] .menu-item-icon svg {
+    color: #ff4757 !important;
+}
+
+.menu-item[data-id="my-command-delete-image"]:hover .menu-item-icon svg {
+    color: #d63031 !important;
+}
