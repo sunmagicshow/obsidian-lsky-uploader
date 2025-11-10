@@ -6,8 +6,7 @@ import {
     Setting,
     PluginSettingTab,
     Editor,
-    requestUrl,
-    TFile
+    requestUrl
 } from 'obsidian';
 
 interface AutoImageSettings {
@@ -52,7 +51,7 @@ export default class LskyUploader extends Plugin {
 
         // 注册右键菜单
         this.registerEvent(
-            this.app.workspace.on('editor-menu', (menu, editor, view) => {
+            this.app.workspace.on('editor-menu', (menu, editor) => {
                 const selectedText = editor.getSelection();
 
                 // 添加上传图床图片菜单项
@@ -68,7 +67,7 @@ export default class LskyUploader extends Plugin {
                             }
                         });
                     // 为菜单项设置特定的 data-id 属性
-                    const itemEl = (item as any).dom as HTMLElement;
+                    const itemEl = (item as unknown as { dom: HTMLElement }).dom;
                     if (itemEl) {
                         itemEl.dataset.id = 'my-command-upload-image';
                     }
@@ -87,7 +86,7 @@ export default class LskyUploader extends Plugin {
                             }
                         });
                     // 为菜单项设置特定的 data-id 属性
-                    const itemEl = (item as any).dom as HTMLElement;
+                    const itemEl = (item as unknown as { dom: HTMLElement }).dom;
                     if (itemEl) {
                         itemEl.dataset.id = 'my-command-delete-image';
                     }
@@ -97,23 +96,66 @@ export default class LskyUploader extends Plugin {
 
         // 原有的粘贴事件处理
         this.registerEvent(this.app.workspace.on('editor-paste', async (evt: ClipboardEvent, editor: Editor) => {
-            // ... 原有的粘贴处理代码保持不变
+            if (!evt.clipboardData) return;
+
+            for (let i = 0; i < evt.clipboardData.items.length; i++) {
+                let item = evt.clipboardData.items[i];
+
+                // 检查是否为图片
+                if (item.type.startsWith('image/')) {
+                    const file = item.getAsFile();
+                    if (file) {
+                        // 阻止默认的粘贴行为
+                        evt.preventDefault();
+
+                        // 获取当前光标位置
+                        const cursor = editor.getCursor();
+                        // 开始上传图片
+                        await this.uploadImage(file, editor, cursor);
+                        break;
+                    }
+                }
+            }
         }));
 
         // 原有的命令注册保持不变
         this.addCommand({
-            id: 'my-command-delete-image',
+            id: 'delete-image',
             name: '删除图床图片',
             checkCallback: (checking: boolean) => {
-                // ... 原有代码保持不变
+                const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+                if (markdownView && markdownView.editor) {
+                    if (!checking) {
+                        const selectedText = markdownView.editor.getSelection();
+                        if (selectedText) {
+                            this.deleteImages(selectedText, markdownView.editor);
+                        } else {
+                            new Notice('请先选中一个有效的图像URL');
+                        }
+                    }
+                    return true;
+                }
+                return false;
             },
         });
 
         this.addCommand({
-            id: 'my-command-upload-image',
+            id: 'upload-image',
             name: '上传图床图片',
             checkCallback: (checking: boolean) => {
-                // ... 原有代码保持不变
+                const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+                if (markdownView && markdownView.editor) {
+                    if (!checking) {
+                        const selectedText = markdownView.editor.getSelection();
+                        if (selectedText) {
+                            this.updateImage(selectedText, markdownView.editor);
+                        } else {
+                            new Notice('请先选中一个有效的图像URL');
+                        }
+                    }
+                    return true;
+                }
+                return false;
             },
         });
 
@@ -121,7 +163,10 @@ export default class LskyUploader extends Plugin {
         this.addSettingTab(new AutoImageSettingTab(this.app, this));
 
         this.registerEvent(this.app.workspace.on('layout-change', () => {
-            // ... 原有代码保持不变
+            const activeLeaf = this.app.workspace.getActiveViewOfType(MarkdownView);
+            if (activeLeaf) {
+                this.editor = activeLeaf.editor;
+            }
         }));
     }
 
@@ -302,8 +347,9 @@ export default class LskyUploader extends Plugin {
             } else if (errors.length === 0 && successCount === 0) {
                 new Notice('没有图片被删除');
             }
-        } catch (error: any) {
-            new Notice(`错误: ${error.message || error}`);
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            new Notice(`错误: ${errorMessage}`);
         }
     }
 
@@ -311,7 +357,7 @@ export default class LskyUploader extends Plugin {
         // 修改正则表达式，匹配三种格式：
         // 1. 标准Markdown图片: [alt](url)
         // 2. 内部链接: ![[filename]]
-        const urlRegex = /(!\[[^\]]*\]\()([^)]+)(\))|(!\[\[([^\]]+)\]\])/gi;
+        const urlRegex = /(!\[[^\]]*\]\()([^)]+)(\))|(!\[\[([^\]]+)]])/gi;
 
         let match;
         let processedText = selectedText;
@@ -399,7 +445,6 @@ export default class LskyUploader extends Plugin {
                     }
 
                     // 将内部链接转换为标准Markdown图片格式
-                    const altText = file.basename || 'image';
                     const replacement = this.settings.image_width === 0
                         ? `![image.${fileExt}](${newUrl})`
                         : `![image.${fileExt}|${this.settings.image_width}](${newUrl})`;
@@ -424,7 +469,6 @@ export default class LskyUploader extends Plugin {
                     if (urlPart.startsWith('http://') || urlPart.startsWith('https://')) {
                         // 网络图片处理逻辑
                         const blackList = this.settings.newWorkBlackDomains.split(',').map(domain => domain.trim()).filter(domain => domain);
-                        ;
                         let domain = '';
                         try {
                             domain = new URL(urlPart).hostname;
@@ -432,7 +476,7 @@ export default class LskyUploader extends Plugin {
                                 blacklistedCount++;
                                 continue;
                             }
-                        } catch (e) {
+                        } catch {
                             // URL解析失败，跳过
                             errors.push(`无效的URL: ${urlPart}`);
                             continue;
@@ -572,8 +616,9 @@ export default class LskyUploader extends Plugin {
                     }
                 }
 
-            } catch (error: any) {
-                errors.push(`错误: ${error.message || error}`);
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                errors.push(`错误: ${errorMessage}`);
             }
         }
 
