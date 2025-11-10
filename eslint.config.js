@@ -65,8 +65,6 @@ export default [
     ignores: [
       'dist/**',
       'node_modules/**',
-      '*.mjs',
-      'check-rules.js', // 确保忽略这个文件
     ],
   },
 ];
