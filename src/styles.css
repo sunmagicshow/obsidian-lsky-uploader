@@ -1,0 +1,46 @@
+/* 图床插件右键菜单样式 */
+
+/* 通用菜单项样式 */
+.menu-item[data-id^="my-command-"] {
+    transition: all 0.2s ease-in-out;
+}
+
+/* 上传命令 - 蓝色 */
+.menu-item[data-id="my-command-upload-image"] {
+    color: #2e86ff !important;
+}
+.menu-item[data-id="my-command-upload-image"]:hover {
+    background-color: rgba(46, 134, 255, 0.1) !important;
+    color: #1a5bb8 !important;
+}
+
+/* 删除命令 - 红色 */
+.menu-item[data-id="my-command-delete-image"] {
+    color: #ff4757 !important;
+}
+.menu-item[data-id="my-command-delete-image"]:hover {
+    background-color: rgba(255, 71, 87, 0.1) !important;
+    color: #d63031 !important;
+}
+
+/* 下载命令 - 绿色 */
+.menu-item[data-id="my-command-download-image"] {
+    color: #00b894 !important;
+}
+.menu-item[data-id="my-command-download-image"]:hover {
+    background-color: rgba(0, 184, 148, 0.1) !important;
+    color: #00a085 !important;
+}
+
+/* 图标颜色统一设置 */
+.menu-item[data-id^="my-command-"] .menu-item-icon svg {
+    color: inherit !important;
+}
+
+/* 统一设置项输入框宽度 */
+.setting-item-control input[type="text"],
+.setting-item-control input[type="number"],
+.setting-item-control textarea {
+    width: 200px !important;
+    max-width: 100%;
+}
