@@ -1,3 +1,5 @@
+import {Editor} from "obsidian";
+
 export interface AutoImageSettings {
     apiBaseURL: string;
     token: string;
@@ -13,6 +15,16 @@ export interface AutoImageSettings {
     defaultDownloadPath: string;
 }
 
+export interface CommandConfig {
+    id: string;
+    key: string;
+    title: () => string;
+    icon: string;
+    action: (selectedText: string, editor: Editor) => Promise<void>;
+    errorKey: string;
+}
+
+
 export const DEFAULT_SETTINGS: AutoImageSettings = {
     apiBaseURL: "",
     token: "",
@@ -27,3 +39,27 @@ export const DEFAULT_SETTINGS: AutoImageSettings = {
     showDownloadButton: false,
     defaultDownloadPath: '',
 };
+// API 响应类型定义
+export interface LskyUploadResponse {
+  data?: {
+    links?: {
+      url: string;
+    };
+    url?: string;
+    // 其他可能的字段
+  };
+  url?: string;
+  status?: string;
+  message?: string;
+}
+
+export interface LskyImageListResponse {
+  data: {
+    data: Array<{
+      name: string;
+      key: string;
+    }>;
+  };
+  status?: string;
+  message?: string;
+}

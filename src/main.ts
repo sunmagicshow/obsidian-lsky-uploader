@@ -1,33 +1,53 @@
-import {Plugin, MarkdownView, Notice, Editor,} from 'obsidian';
-import {AutoImageSettings, DEFAULT_SETTINGS} from './types';
+import {
+    Plugin,
+    MarkdownView,
+    Notice,
+    Editor,
+    MenuItem,
+    Menu,
+} from 'obsidian';
+import {AutoImageSettings, CommandConfig, DEFAULT_SETTINGS} from './types';
 import {LskyUploaderView} from './lskyUploaderView';
 import {LskyUploaderSettingTab} from './lskyUploaderSettingTab';
 import {i18n} from './i18n';
 
-export default class LskyUploader extends Plugin {
-    settings: AutoImageSettings = DEFAULT_SETTINGS;
-    editor?: Editor;
-    uploaderView!: LskyUploaderView;
+declare module 'obsidian' {
+    interface MenuItem {
+        dom: HTMLElement | undefined;
+    }
+}
+/* global setTimeout */
 
-    // 命令配置
-    private readonly commandConfigs = [
+/**
+ * LskyUploader 插件主类
+ * 负责图片上传、删除、下载等功能
+ */
+export default class LskyUploader extends Plugin {
+    public settings: AutoImageSettings = DEFAULT_SETTINGS;
+    public editor?: Editor;
+    public uploaderView!: LskyUploaderView;
+
+    /**
+     * 命令配置数组
+     */
+    private readonly commandConfigs: CommandConfig[] = [
         {
             id: 'upload-image',
             key: 'showUploadButton',
             title: () => i18n.t.commands.upload_image,
             icon: 'upload',
-            action: (selectedText: string, editor: Editor) =>
+            action: async (selectedText: string, editor: Editor) =>
                 this.uploaderView.uploadImage(selectedText, editor, this.app),
-            errorKey: 'upload_failed'
+            errorKey: 'upload_failed',
         },
         {
             id: 'delete-image',
             key: 'showDeleteButton',
             title: () => i18n.t.commands.delete_image,
             icon: 'trash',
-            action: (selectedText: string, editor: Editor) =>
+            action: async (selectedText: string, editor: Editor) =>
                 this.uploaderView.deleteImages(selectedText, editor),
-            errorKey: 'delete_failed'
+            errorKey: 'delete_failed',
         },
         {
             id: 'download-image',
@@ -36,65 +56,78 @@ export default class LskyUploader extends Plugin {
             icon: 'download',
             action: (selectedText: string) =>
                 this.uploaderView.downloadImages(selectedText, this.app),
-            errorKey: 'download_failed'
-        }
+            errorKey: 'download_failed',
+        },
     ];
 
-    async loadSettings() {
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-        this.uploaderView = new LskyUploaderView(this.settings);
+    /**
+     * 加载插件设置
+     */
+    public async loadSettings(): Promise<void> {
+        const savedSettings = (await this.loadData()) as Partial<AutoImageSettings>;
+        this.settings = {...DEFAULT_SETTINGS, ...savedSettings};
+        if (!this.uploaderView) {
+            this.uploaderView = new LskyUploaderView(this.settings);
+        }
     }
 
-    async saveSettings() {
-        await this.saveData(this.settings);
-        this.uploaderView = new LskyUploaderView(this.settings);
-        this.updateCommands();
-    }
-
-    async onload() {
-        console.log('Manifest:', this.manifest);
+    /**
+     * 插件加载时的初始化逻辑
+     */
+    public async onload(): Promise<void> {
         if (!this.manifest) {
-            console.error('Manifest is undefined.');
             return;
         }
+
         await this.loadSettings();
 
         // 注册右键菜单
         this.registerEvent(
-            this.app.workspace.on('editor-menu', (menu, editor) => {
+            this.app.workspace.on('editor-menu', (menu: Menu, editor: Editor) => {
                 const selectedText = editor.getSelection();
                 this.registerContextMenuItems(menu, selectedText, editor);
-            })
+            }),
         );
 
-        // 粘贴事件处理
-        this.registerEvent(this.app.workspace.on('editor-paste', async (evt: ClipboardEvent, editor: Editor) => {
-            await this.handlePasteEvent(evt, editor);
-        }));
+        // 注册粘贴事件处理
+        this.registerEvent(
+            this.app.workspace.on('editor-paste', async (evt: ClipboardEvent, editor: Editor) => {
+                await this.handlePasteEvent(evt, editor);
+            }),
+        );
 
         // 注册命令
         this.registerCommands();
 
-        // 设置选项卡和布局变化监听
+        // 添加设置选项卡
         this.addSettingTab(new LskyUploaderSettingTab(this.app, this));
 
-        this.registerEvent(this.app.workspace.on('layout-change', () => {
-            const activeLeaf = this.app.workspace.getActiveViewOfType(MarkdownView);
-            if (activeLeaf) {
-                this.editor = activeLeaf.editor;
-            }
-        }));
+        // 注册布局变化监听
+        this.registerEvent(
+            this.app.workspace.on('layout-change', () => {
+                this.updateActiveEditor();
+            }),
+        );
     }
 
-    onunload() {
+    /**
+     * 插件卸载时的清理逻辑
+     */
+    public onunload(): void {
         new Notice(i18n.t.general.plugin_unloaded);
     }
 
-    // 注册右键菜单项
-    private registerContextMenuItems(menu: any, selectedText: string, editor: Editor) {
-        this.commandConfigs.forEach(config => {
+
+    /**
+     * 注册右键菜单项
+     * @param menu - 菜单对象
+     * @param selectedText - 选中的文本
+     * @param editor - 编辑器实例
+     */
+    private registerContextMenuItems(menu: Menu, selectedText: string, editor: Editor): void {
+        this.commandConfigs.forEach((config: CommandConfig) => {
             if (this.settings[config.key as keyof AutoImageSettings]) {
-                menu.addItem((item: any) => {
+                menu.addItem((item: MenuItem) => {
                     item
                         .setTitle(config.title())
                         .setIcon(config.icon)
@@ -106,21 +139,31 @@ export default class LskyUploader extends Plugin {
                             }
                         });
 
-                    const itemEl = (item as unknown as { dom: HTMLElement }).dom;
-                    if (itemEl) {
-                        itemEl.dataset.id = `my-command-${config.id}`;
-                    }
+                    // 延迟设置 DOM 属性以确保元素已创建
+                    setTimeout(() => {
+                        if (item.dom && item.dom instanceof HTMLElement) {
+                            item.dom.setAttribute('data-id', `my-command-${config.id}`);
+                        }
+                    }, 0);
                 });
             }
         });
     }
 
-    // 处理粘贴事件
-    private async handlePasteEvent(evt: ClipboardEvent, editor: Editor) {
-        if (!evt.clipboardData || !this.settings.is_upload_clipboard) return;
+    /**
+     * 处理粘贴事件
+     * @param evt - 剪贴板事件
+     * @param editor - 编辑器实例
+     */
+    private async handlePasteEvent(evt: ClipboardEvent, editor: Editor): Promise<void> {
+        if (!evt.clipboardData || !this.settings.is_upload_clipboard) {
+            return;
+        }
 
-        for (let i = 0; i < evt.clipboardData.items.length; i++) {
-            const item = evt.clipboardData.items[i];
+        const {items} = evt.clipboardData;
+
+        for (let i = 0; i < items.length; i += 1) {
+            const item = items[i];
 
             if (item.type.startsWith('image/')) {
                 const file = item.getAsFile();
@@ -134,9 +177,11 @@ export default class LskyUploader extends Plugin {
         }
     }
 
-    // 注册命令
-    private registerCommands() {
-        this.commandConfigs.forEach(config => {
+    /**
+     * 注册所有命令
+     */
+    private registerCommands(): void {
+        this.commandConfigs.forEach((config: CommandConfig) => {
             if (this.settings[config.key as keyof AutoImageSettings]) {
                 this.addCommand({
                     id: config.id,
@@ -147,7 +192,7 @@ export default class LskyUploader extends Plugin {
                             if (!checking) {
                                 const selectedText = markdownView.editor.getSelection();
                                 if (selectedText) {
-                                    this.executeAction(config, selectedText, markdownView.editor);
+                                    void this.executeAction(config, selectedText, markdownView.editor);
                                 } else {
                                     new Notice(i18n.getNoSelectionText());
                                 }
@@ -161,21 +206,27 @@ export default class LskyUploader extends Plugin {
         });
     }
 
-    // 执行操作
-    private async executeAction(config: any, selectedText: string, editor?: Editor) {
+    /**
+     * 执行命令操作
+     * @param config - 命令配置
+     * @param selectedText - 选中的文本
+     * @param editor - 编辑器实例
+     */
+    private async executeAction(config: CommandConfig, selectedText: string, editor: Editor): Promise<void> {
         try {
             await config.action(selectedText, editor);
-        } catch (error) {
-            console.error(`${config.id} failed:`, error);
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            new Notice(`${i18n.t.general[config.errorKey as keyof typeof i18n.t.general]}: ${errorMessage}`);
+        } catch {
+            new Notice(`${i18n.t.general[config.errorKey as keyof typeof i18n.t.general]}`);
         }
     }
 
-    // 更新命令
-    private updateCommands() {
-        // @ts-ignore - 访问内部 commands 对象
-        this.commands = {};
-        this.registerCommands();
+    /**
+     * 更新当前活动的编辑器实例
+     */
+    private updateActiveEditor(): void {
+        const activeLeaf = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (activeLeaf) {
+            this.editor = activeLeaf.editor;
+        }
     }
 }

@@ -1,4 +1,3 @@
-// i18n.ts
 import {getLanguage} from 'obsidian';
 
 interface SettingItem {
@@ -302,8 +301,8 @@ const locales: Record<Locale, LangPack> = {zh, en};
 
 // 获取系统语言
 function getSystemLocale(): Locale {
-    const language = getLanguage() || navigator.language || 'en';
-    return language.toLowerCase().startsWith('zh') ? 'zh' : 'en';
+    const language = getLanguage();
+    return language.startsWith('zh') ? 'zh' : 'en';
 }
 
 // 获取当前语言包

@@ -23,7 +23,7 @@ export class LskyUploaderSettingTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.apiBaseURL)
                 .onChange(async (value) => {
                     this.plugin.settings.apiBaseURL = value.trim().replace(/\/+$/, "");
-                    await this.plugin.saveSettings();
+                    await this.plugin.saveData(this.plugin.settings);
                 })
             );
 
@@ -36,7 +36,7 @@ export class LskyUploaderSettingTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.token)
                 .onChange(async (value) => {
                     this.plugin.settings.token = value.trim();
-                    await this.plugin.saveSettings();
+                    await this.plugin.saveData(this.plugin.settings);
                 })
             );
 
@@ -55,7 +55,7 @@ export class LskyUploaderSettingTab extends PluginSettingTab {
                         const intValue = parseInt(value.trim(), 10);
                         if (!isNaN(intValue)) {
                             this.plugin.settings.strategy_id = intValue;
-                            await this.plugin.saveSettings();
+                            await this.plugin.saveData(this.plugin.settings);
                         } else {
                             new Notice(i18n.t.general.invalid_number);
                         }
@@ -70,7 +70,7 @@ export class LskyUploaderSettingTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.newWorkBlackDomains)
                 .onChange(async (value) => {
                     this.plugin.settings.newWorkBlackDomains = value;
-                    await this.plugin.saveSettings();
+                    await this.plugin.saveData(this.plugin.settings);
                 }));
 
         // 图片宽度设置
@@ -88,7 +88,7 @@ export class LskyUploaderSettingTab extends PluginSettingTab {
                         const intValue = parseInt(value.trim(), 10);
                         if (!isNaN(intValue)) {
                             this.plugin.settings.image_width = intValue;
-                            await this.plugin.saveSettings();
+                            await this.plugin.saveData(this.plugin.settings);
                         } else {
                             new Notice(i18n.t.general.invalid_number);
                         }
@@ -110,7 +110,7 @@ export class LskyUploaderSettingTab extends PluginSettingTab {
                         const intValue = parseInt(value.trim(), 10);
                         if (!isNaN(intValue)) {
                             this.plugin.settings.limit_count = intValue;
-                            await this.plugin.saveSettings();
+                            await this.plugin.saveData(this.plugin.settings);
                         } else {
                             new Notice(i18n.t.general.invalid_number);
                         }
@@ -125,7 +125,7 @@ export class LskyUploaderSettingTab extends PluginSettingTab {
                 toggle.setValue(this.plugin.settings.is_upload_clipboard || false)
                     .onChange(async (value) => {
                         this.plugin.settings.is_upload_clipboard = value;
-                        await this.plugin.saveSettings();
+                        await this.plugin.saveData(this.plugin.settings);
                     });
             });
 
@@ -137,7 +137,7 @@ export class LskyUploaderSettingTab extends PluginSettingTab {
                 toggle.setValue(this.plugin.settings.showUploadButton || false)
                     .onChange(async (value) => {
                         this.plugin.settings.showUploadButton = value;
-                        await this.plugin.saveSettings();
+                        await this.plugin.saveData(this.plugin.settings);
                     });
             });
 
@@ -149,7 +149,7 @@ export class LskyUploaderSettingTab extends PluginSettingTab {
                 toggle.setValue(this.plugin.settings.is_need_delete || false)
                     .onChange(async (value) => {
                         this.plugin.settings.is_need_delete = value;
-                        await this.plugin.saveSettings();
+                        await this.plugin.saveData(this.plugin.settings);
                     });
             });
 
@@ -161,7 +161,7 @@ export class LskyUploaderSettingTab extends PluginSettingTab {
                 toggle.setValue(this.plugin.settings.showDeleteButton || false)
                     .onChange(async (value) => {
                         this.plugin.settings.showDeleteButton = value;
-                        await this.plugin.saveSettings();
+                        await this.plugin.saveData(this.plugin.settings);
                     });
             });
 
@@ -173,7 +173,7 @@ export class LskyUploaderSettingTab extends PluginSettingTab {
                 toggle.setValue(this.plugin.settings.showDownloadButton || false)
                     .onChange(async (value) => {
                         this.plugin.settings.showDownloadButton = value;
-                        await this.plugin.saveSettings();
+                        await this.plugin.saveData(this.plugin.settings);
                     });
             });
 
@@ -186,7 +186,7 @@ export class LskyUploaderSettingTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.defaultDownloadPath || '')
                 .onChange(async (value) => {
                     this.plugin.settings.defaultDownloadPath = value.trim();
-                    await this.plugin.saveSettings();
+                    await this.plugin.saveData(this.plugin.settings);
                 })
             );
     }

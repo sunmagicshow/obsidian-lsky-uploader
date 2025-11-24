@@ -7,5 +7,5 @@
   "minAppVersion": "1.7.4",
   "main": "src/main.js",
   "isDesktopOnly": false,
-  "css": "src/styles.css"
+  "css": "styles.css"
 }

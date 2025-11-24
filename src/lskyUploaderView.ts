@@ -1,5 +1,5 @@
 import {App, Editor, Notice, requestUrl, TFile, normalizePath} from 'obsidian';
-import {AutoImageSettings} from './types';
+import {AutoImageSettings, LskyImageListResponse, LskyUploadResponse} from './types';
 import {i18n} from './i18n';
 
 export class LskyUploaderView {
@@ -75,7 +75,8 @@ export class LskyUploaderView {
                     continue;
                 }
 
-                const list = response.json.data.data;
+                const responseData = response.json as LskyImageListResponse;
+                const list = responseData.data.data;
                 let found = false;
 
                 if (list.length > 0) {
@@ -118,9 +119,8 @@ export class LskyUploaderView {
             } else if (errors.length === 0 && successCount === 0) {
                 new Notice(i18n.t.results.no_images_deleted);
             }
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            new Notice(`${i18n.t.general.delete_failed}: ${errorMessage}`);
+        } catch {
+            new Notice(`${i18n.t.general.delete_failed}`);
         }
     }
 
@@ -167,10 +167,9 @@ export class LskyUploaderView {
 
                     if (this.settings.is_need_delete) {
                         try {
-                            await app.vault.trash(file, false);
-                            console.log(`Deleted internal image: ${fileName}`);
-                        } catch (error) {
-                            errors.push(`Failed to delete internal image: ${(error as Error).message}`);
+                            await app.fileManager.trashFile(file);
+                        } catch {
+                            errors.push(`Failed to delete internal image`);
                         }
                     }
 
@@ -208,10 +207,9 @@ export class LskyUploaderView {
 
                         if (this.settings.is_need_delete) {
                             try {
-                                await app.vault.trash(file, false);
-                                console.log(`Deleted local image: ${filePath}`);
-                            } catch (error) {
-                                errors.push(`Failed to delete local image: ${(error as Error).message}`);
+                                await app.fileManager.trashFile(file);
+                            } catch {
+                                errors.push(`Failed to delete local image`);
                             }
                         }
                     }
@@ -413,7 +411,7 @@ export class LskyUploaderView {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('strategy_id', this.settings.strategy_id.toString());
-
+        // eslint-disable-next-line no-restricted-globals, no-undef
         const response = await fetch(`${this.settings.apiBaseURL}/api/v1/upload`, {
             method: 'POST',
             headers: {
@@ -426,7 +424,7 @@ export class LskyUploaderView {
             throw new Error(`${i18n.t.general.upload_failed}: ${response.status}`);
         }
 
-        const responseData = await response.json();
+        const responseData = await response.json() as LskyUploadResponse;
 
         if (responseData.data && responseData.data.links && responseData.data.links.url) {
             return responseData.data.links.url;
