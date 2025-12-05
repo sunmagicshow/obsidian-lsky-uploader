@@ -5,7 +5,6 @@
   "description": "Lsky Uploader.",
   "author": "蓝星晓夜",
   "minAppVersion": "1.7.4",
-  "main": "src/main.js",
-  "isDesktopOnly": false,
+  "isDesktopOnly": true,
   "css": "styles.css"
 }

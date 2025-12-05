@@ -20,7 +20,7 @@ await build({
 
 // 复制文件
 try {
-    const Content = readFileSync('styles.css', 'utf8');
+    const Content = readFileSync('src/styles.css', 'utf8');
     const Content2 = readFileSync('manifest.json', 'utf8');
     writeFileSync('dist/styles.css', Content);
     writeFileSync('dist/manifest.json', Content2);
