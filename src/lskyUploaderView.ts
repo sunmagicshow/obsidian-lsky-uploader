@@ -26,43 +26,53 @@ export class LskyUploaderView {
         }
     }
 
-    async deleteImages(selectedText: string, editor: Editor): Promise<void> {
-        try {
-            const urlRegex = /\bhttps?:\/\/[^\s)]+\.(jpeg|jpg|png|gif|tif|bmp|ico|psd|webp)/g;
-            const imageUrls = selectedText.match(urlRegex)?.map(match => match.trim()) || [];
+async deleteImages(selectedText: string, editor: Editor): Promise<void> {
+    try {
+        const urlRegex = /\bhttps?:\/\/[^\s)]+\.(jpeg|jpg|png|gif|tif|bmp|ico|psd|webp)/g;
+        const imageUrls = selectedText.match(urlRegex)?.map(match => match.trim()) || [];
 
-            if (imageUrls.length === 0) {
-                new Notice(i18n.t.general.no_images_found);
-                return;
+        if (imageUrls.length === 0) {
+            new Notice(i18n.t.general.no_images_found);
+            return;
+        }
+
+        let updatedSelection = selectedText;
+        let errors: string[] = [];
+        let successCount = 0;
+        let skippedCount = 0;
+
+        const headers = {
+            'Accept': 'application/json',
+            'Authorization': this.settings.token.startsWith('Bearer ') ? this.settings.token : 'Bearer ' + this.settings.token,
+        };
+
+        for (let i = 0; i < imageUrls.length; i++) {
+            const imageUrl = imageUrls[i];
+
+            // 检查是否超过 limit_count
+            if (this.settings.limit_count > 0 && i >= this.settings.limit_count) {
+                skippedCount++;
+                continue;
             }
 
-            let updatedSelection = selectedText;
-            let errors: string[] = [];
-            let successCount = 0;
-            let skippedCount = 0;
+            const name = imageUrl.split("/").pop();
+            if (!name) {
+                errors.push(`${i18n.t.errors.invalid_image_url}: ${imageUrl}`);
+                continue;
+            }
 
-            const headers = {
-                'Accept': 'application/json',
-                'Authorization': this.settings.token.startsWith('Bearer ') ? this.settings.token : 'Bearer ' + this.settings.token,
-            };
+            // 第一步：使用文件名第一个"-"前的部分作为关键词（精确搜索）
+            const primaryKeyword = name.split("-")[0];
 
-            for (let i = 0; i < imageUrls.length; i++) {
-                const imageUrl = imageUrls[i];
+            // 第二步：如果没有找到，使用固定关键词"20"扩大搜索范围
+            const fallbackKeyword = "20";
 
-                // 检查是否超过 limit_count
-                if (this.settings.limit_count > 0 && i >= this.settings.limit_count) {
-                    skippedCount++;
-                    continue;
-                }
+            let found = false;
+            let searchErrors: string[] = [];
 
-                const name = imageUrl.split("/").pop();
-                if (!name) {
-                    errors.push(`${i18n.t.errors.invalid_image_url}: ${imageUrl}`);
-                    continue;
-                }
-
-                const keyword = name.split("-")[0];
-                const requestUrlString = `${this.settings.apiBaseURL}/api/v1/images?keyword=${keyword}`;
+            // 搜索函数封装，避免重复代码
+            const searchAndDelete = async (keyword: string, searchType: string): Promise<boolean> => {
+                const requestUrlString = `${this.settings.apiBaseURL}/api/v1/images?keyword=${encodeURIComponent(keyword)}`;
                 const response = await requestUrl({
                     url: requestUrlString,
                     method: 'GET',
@@ -71,13 +81,12 @@ export class LskyUploaderView {
                 });
 
                 if (response.status !== 200) {
-                    errors.push(`${i18n.t.errors.get_image_failed}: ${response.status}`);
-                    continue;
+                    searchErrors.push(`${searchType}搜索失败: ${response.status}`);
+                    return false;
                 }
 
                 const responseData = response.json as LskyImageListResponse;
                 const list = responseData.data.data;
-                let found = false;
 
                 if (list.length > 0) {
                     for (const item of list) {
@@ -90,39 +99,53 @@ export class LskyUploaderView {
                             });
 
                             if (deleteResponse.status === 200 || deleteResponse.text) {
-                                found = true;
                                 updatedSelection = updatedSelection.replace(imageUrl, '');
                                 successCount++;
+                                return true;
                             } else {
-                                errors.push(`${i18n.t.errors.image_delete_failed}: ${deleteResponse.status}`);
+                                searchErrors.push(`${i18n.t.errors.image_delete_failed}: ${deleteResponse.status}`);
+                                return false;
                             }
                         }
                     }
                 }
+                return false;
+            };
 
-                if (!found) {
-                    errors.push(`${i18n.t.errors.image_not_found}: ${imageUrl}`);
-                }
+            // 第一步：精确搜索
+            found = await searchAndDelete(primaryKeyword, "精确");
+
+            // 第二步：如果没有找到，使用扩大范围搜索
+            if (!found) {
+                found = await searchAndDelete(fallbackKeyword, "扩大范围");
             }
 
-            editor.replaceSelection(updatedSelection);
-
-            // 显示结果通知
-            if (errors.length > 0) {
-                new Notice(`${i18n.t.errors.delete_errors}: \n${errors.join('\n')}`);
+            if (!found) {
+                const errorMsg = searchErrors.length > 0
+                    ? `${i18n.t.errors.image_not_found}: ${imageUrl} (${searchErrors.join('; ')})`
+                    : `${i18n.t.errors.image_not_found}: ${imageUrl}`;
+                errors.push(errorMsg);
             }
-            if (successCount > 0) {
-                new Notice(i18n.getSuccessDeleteText(successCount));
-            }
-            if (skippedCount > 0) {
-                new Notice(i18n.getLimitSkippedText('delete', this.settings.limit_count, skippedCount));
-            } else if (errors.length === 0 && successCount === 0) {
-                new Notice(i18n.t.results.no_images_deleted);
-            }
-        } catch {
-            new Notice(`${i18n.t.general.delete_failed}`);
         }
+
+        editor.replaceSelection(updatedSelection);
+
+        // 显示结果通知
+        if (errors.length > 0) {
+            new Notice(`${i18n.t.errors.delete_errors}: \n${errors.join('\n')}`);
+        }
+        if (successCount > 0) {
+            new Notice(i18n.getSuccessDeleteText(successCount));
+        }
+        if (skippedCount > 0) {
+            new Notice(i18n.getLimitSkippedText('delete', this.settings.limit_count, skippedCount));
+        } else if (errors.length === 0 && successCount === 0) {
+            new Notice(i18n.t.results.no_images_deleted);
+        }
+    } catch {
+        new Notice(`${i18n.t.general.delete_failed}`);
     }
+}
 
     async uploadImage(selectedText: string, editor: Editor, app: App): Promise<void> {
         const urlRegex = /(!\[[^\]]*]\()([^)]+)(\))|(!\[\[([^\]]+)]])/gi;
